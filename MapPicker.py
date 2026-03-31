@@ -1,4 +1,5 @@
 import random
+from collections.abc import Iterable
 from types import MappingProxyType
 from typing import Final
 
@@ -28,48 +29,19 @@ class MapPicker:
             self.remove_maps(ban_maps)
 
     def remove_maps(self, ban_maps: list[int | str]) -> None:
+        self._validate_targets(ban_maps, "ban_maps")
+
         for target in ban_maps:
-            delete_key = None
-
-            # 数字指定の場合
-            if isinstance(target, int):
-                if target in self.maps:
-                    delete_key = target
-
-            # 文字列指定の場合
-            elif isinstance(target, str):
-                target = target.strip()
-
-                # "1" のような数字文字列なら番号として扱う
-                if target.isdigit():
-                    key = int(target)
-                    if key in self.maps:
-                        delete_key = key
-                else:
-                    # マップ名として比較（大文字小文字無視）
-                    for k, v in self.maps.items():
-                        if v.lower() == target.lower():
-                            delete_key = k
-                            break
-            if delete_key is not None:
+            delete_key = self._resolve_map_key(target)
+            if delete_key in self.maps:
                 del self.maps[delete_key]
 
     def add_maps(self, add_maps_list: list[int | str]) -> None:
+        self._validate_targets(add_maps_list, "add_maps_list")
+
         for target in add_maps_list:
-            if isinstance(target, int):
-                if 1 <= target <= len(self.MAPS):
-                    self.maps[target] = self.MAPS[target]
-            elif isinstance(target, str):
-                target = target.strip()
-                if target.isdigit():
-                    key = int(target)
-                    if 1 <= key <= len(self.MAPS):
-                        self.maps[key] = self.MAPS[key]
-                else:
-                    for k, v in self.MAPS.items():
-                        if v.lower() == target.lower():
-                            self.maps[k] = v
-                            break
+            add_key = self._resolve_map_key(target)
+            self.maps[add_key] = self.MAPS[add_key]
 
     def pick_random_maps(self, count: int = 1) -> dict[int, str]:
         if not self.maps:
@@ -88,3 +60,32 @@ class MapPicker:
 
     def init(self) -> None:
         self.maps = dict(self.MAPS)
+
+    def _validate_targets(self, targets: Iterable[int | str], argument_name: str) -> None:
+        if not isinstance(targets, Iterable) or isinstance(targets, (str, bytes)):
+            raise TypeError(f"{argument_name} には int または str のリストを渡してください。")
+
+    def _resolve_map_key(self, target: int | str) -> int:
+
+        if isinstance(target, int):
+            if target in self.MAPS:
+                return target
+            raise ValueError(f"無効なマップ番号です: {target}")
+
+        if isinstance(target, str):
+            normalized_target = target.strip()
+            if not normalized_target:
+                raise ValueError("空文字列はマップ指定として使用できません。")
+
+            if normalized_target.isdigit():
+                key = int(normalized_target)
+                if key in self.MAPS:
+                    return key
+                raise ValueError(f"無効なマップ番号です: {target}")
+
+            for key, map_name in self.MAPS.items():
+                if map_name.lower() == normalized_target.lower():
+                    return key
+            raise ValueError(f"無効なマップ名です: {target}")
+
+        raise TypeError(f"int または str でマップを指定してください: {target}")
